@@ -24,7 +24,7 @@ async function startServer() {
 
       const apiKey = process.env.REMOVE_BG_API_KEY;
       if (!apiKey) {
-        res.status(500).json({ error: "REMOVE_BG_API_KEY environment variable is missing" });
+        res.status(500).json({ error: "Missing API Key: Please set REMOVE_BG_API_KEY in the application settings." });
         return;
       }
 
@@ -46,10 +46,23 @@ async function startServer() {
       res.setHeader("Content-Type", "image/png");
       res.send(response.data);
     } catch (error: any) {
-      console.error("Error removing background:", error?.response?.data?.toString() || error.message);
-      res.status(error.response?.status || 500).json({ 
-        error: "Failed to remove background. Ensure your API key is valid." 
-      });
+      let errorMsg = "Failed to remove background. Ensure your API key is valid.";
+      
+      if (error.response?.data) {
+        try {
+          // data is an ArrayBuffer because we set responseType: 'arraybuffer'
+          const decodedString = Buffer.from(error.response.data).toString('utf-8');
+          const errObj = JSON.parse(decodedString);
+          if (errObj.errors && errObj.errors.length > 0) {
+            errorMsg = errObj.errors[0].title || errorMsg;
+          }
+        } catch (e) {
+          // ignore parsing error
+        }
+      }
+      
+      console.error("Error removing background:", errorMsg);
+      res.status(error.response?.status || 500).json({ error: errorMsg });
     }
   });
 

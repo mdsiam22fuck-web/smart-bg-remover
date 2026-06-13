@@ -23,6 +23,7 @@ export default function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const [bgColor, setBgColor] = useState('transparent');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -38,6 +39,7 @@ export default function App() {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
+      setErrorMessage(null);
       
       if (originalUrl) URL.revokeObjectURL(originalUrl);
       if (resultUrl) URL.revokeObjectURL(resultUrl);
@@ -55,6 +57,7 @@ export default function App() {
     
     setIsProcessing(true);
     setProgress(0);
+    setErrorMessage(null);
     setStatusText('Processing image...');
 
     try {
@@ -79,7 +82,7 @@ export default function App() {
       setStatusText('Background removed successfully!');
     } catch (error: any) {
       console.error(error);
-      setStatusText(error.message || 'Something went wrong. Please try again.');
+      setErrorMessage(error.message || 'Something went wrong. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -119,6 +122,7 @@ export default function App() {
     setFile(null);
     setOriginalUrl(null);
     setResultUrl(null);
+    setErrorMessage(null);
     setStatusText('');
     setProgress(0);
     setBgColor('transparent');
@@ -262,6 +266,11 @@ export default function App() {
                       <p className="text-sm text-slate-400 mb-8 leading-relaxed">
                         Image uploaded. Click the button below to remove background.
                       </p>
+                      {errorMessage && (
+                        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm font-medium">
+                          <p>{errorMessage}</p>
+                        </div>
+                      )}
                       <button
                         onClick={processImage}
                         disabled={isProcessing}
