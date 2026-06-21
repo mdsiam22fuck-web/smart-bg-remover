@@ -1,6 +1,6 @@
 {
-  "name": "Background Remover",
-  "description": "Remove and change photo backgrounds instantly.",
+  "name": "AI Background Remover",
+  "description": "Professional SaaS tool to automatically remove image backgrounds using AI. Includes custom styling and SEO optimizations.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

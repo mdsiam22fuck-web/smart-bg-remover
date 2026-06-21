@@ -1,10 +1,9 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Download, RefreshCw, Palette, Image as ImageIcon, Sparkles, X, CheckCircle2, Send, Zap, Wand2, Shield } from 'lucide-react';
+import { 
+  Upload, Download, RefreshCw, Palette, Image as ImageIcon, 
+  Sparkles, X, CheckCircle2, Zap, Wand2, Shield, Lock, 
+  Clock, ArrowRight, Star, UploadCloud, ChevronDown
+} from 'lucide-react';
 
 const COLORS = [
   { id: 'transparent', label: 'Transparent', value: 'transparent' },
@@ -24,31 +23,54 @@ export default function App() {
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isHovering, setIsHovering] = useState(false);
   
   const [bgColor, setBgColor] = useState('transparent');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [currentView, setCurrentView] = useState<'home' | 'about' | 'privacy' | 'terms' | 'contact'>('home');
 
   useEffect(() => {
     return () => {
       if (originalUrl) URL.revokeObjectURL(originalUrl);
       if (resultUrl) URL.revokeObjectURL(resultUrl);
     };
-  }, []);
+  }, [originalUrl, resultUrl]);
+
+  const handleFile = (selectedFile: File) => {
+    setFile(selectedFile);
+    setErrorMessage(null);
+    
+    if (originalUrl) URL.revokeObjectURL(originalUrl);
+    if (resultUrl) URL.revokeObjectURL(resultUrl);
+    
+    setOriginalUrl(URL.createObjectURL(selectedFile));
+    setResultUrl(null);
+    setBgColor('transparent');
+    setProgress(0);
+    setStatusText('');
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      setFile(selectedFile);
-      setErrorMessage(null);
-      
-      if (originalUrl) URL.revokeObjectURL(originalUrl);
-      if (resultUrl) URL.revokeObjectURL(resultUrl);
-      
-      setOriginalUrl(URL.createObjectURL(selectedFile));
-      setResultUrl(null);
-      setBgColor('transparent');
-      setProgress(0);
-      setStatusText('');
+      handleFile(e.target.files[0]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsHovering(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsHovering(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsHovering(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFile(e.dataTransfer.files[0]);
     }
   };
 
@@ -58,27 +80,35 @@ export default function App() {
     setIsProcessing(true);
     setProgress(0);
     setErrorMessage(null);
-    setStatusText('Processing image...');
+    setStatusText('Processing image precisely...');
 
     try {
+      const progressInterval = setInterval(() => {
+        setProgress(prev => Math.min(prev + 5, 90));
+      }, 200);
+
       const formData = new FormData();
       formData.append('image_file', file);
-      
-      setProgress(50);
+      if (bgColor !== 'transparent') {
+        formData.append('bg_color', bgColor);
+      }
+
       const response = await fetch('/api/remove-bg', {
         method: 'POST',
         body: formData,
       });
 
+      clearInterval(progressInterval);
+      setProgress(100);
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || 'Failed to remove background');
+        throw new Error(errorData?.error || 'Failed to process image');
       }
 
-      const imageBlob = await response.blob();
-      setProgress(100);
-      const url = URL.createObjectURL(imageBlob);
-      setResultUrl(url);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      setResultUrl(objectUrl);
       setStatusText('Background removed successfully!');
     } catch (error: any) {
       console.error(error);
@@ -90,32 +120,16 @@ export default function App() {
 
   const handleDownload = () => {
     if (!resultUrl) return;
-    
-    if (bgColor === 'transparent') {
-      const a = document.createElement('a');
-      a.href = resultUrl;
-      a.download = `bg-removed-${file?.name || 'image'}.png`;
-      a.click();
-    } else {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        if (ctx) {
-          ctx.fillStyle = bgColor;
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0);
-          const dataUrl = canvas.toDataURL('image/png');
-          const a = document.createElement('a');
-          a.href = dataUrl;
-          a.download = `edited-${file?.name || 'image'}.png`;
-          a.click();
-        }
-      };
-      img.src = resultUrl;
-    }
+    const a = document.createElement('a');
+    a.href = resultUrl;
+    a.download = `removed-bg-${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
   };
 
   const resetAll = () => {
@@ -131,323 +145,507 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    // Scroll to results when processing is done
+    if (resultUrl) {
+      window.scrollTo({ top: document.getElementById('results-section')?.offsetTop, behavior: 'smooth' });
+    }
+  }, [resultUrl]);
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans relative overflow-hidden flex flex-col">
-      {/* Background Blobs */}
-        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-violet-600/20 blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-fuchsia-600/20 blur-[120px] pointer-events-none" />
-        
-        {/* Header */}
-        <header className="bg-slate-950/50 backdrop-blur-md border-b border-white/5 sticky top-0 z-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-br from-violet-600 to-fuchsia-600 p-2 rounded-xl text-white shadow-lg shadow-violet-500/20">
-                <Sparkles size={20} />
-              </div>
-              <h1 className="text-xl font-bold tracking-tight flex items-center gap-1.5">
-                <span className="text-white">Photo</span>
-                <span className="bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-fuchsia-400">
-                  Background Remove
-                </span>
-              </h1>
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
+      {/* Header */}
+      <header className="fixed top-0 inset-x-0 bg-white/80 backdrop-blur-md border-b border-slate-200 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => { resetAll(); setCurrentView('home'); }}>
+            <div className="bg-gradient-to-br from-indigo-600 to-purple-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-200">
+              <Sparkles size={24} />
             </div>
+            <span className="text-xl md:text-2xl font-bold tracking-tight text-slate-900 hidden sm:block">
+              AI Background Remover
+            </span>
+          </div>
+          <nav className="hidden md:flex items-center gap-6">
+            <button onClick={() => setCurrentView('home')} className="text-slate-600 hover:text-indigo-600 font-medium">Home</button>
+            <button onClick={() => { setCurrentView('home'); setTimeout(() => document.getElementById('features')?.scrollIntoView({behavior: 'smooth'}), 50); }} className="text-slate-600 hover:text-indigo-600 font-medium">Features</button>
+            <button onClick={() => { setCurrentView('home'); setTimeout(() => document.getElementById('faq')?.scrollIntoView({behavior: 'smooth'}), 50); }} className="text-slate-600 hover:text-indigo-600 font-medium">FAQ</button>
+            <button onClick={() => setCurrentView('contact')} className="text-slate-600 hover:text-indigo-600 font-medium">Contact</button>
+            <button onClick={() => { setCurrentView('home'); triggerFileInput(); }} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-sm transition-all">
+              Upload Image
+            </button>
+          </nav>
+        </div>
+      </header>
+
+      <main className="pt-24 pb-16">
+        {currentView === 'home' ? (
+          <>
+            {/* HERO SECTION */}
+        <section className="px-4 py-16 md:py-24 max-w-7xl mx-auto text-center" id="hero">
+          <div className="mb-10 animate-fade-in-up">
+            <h1 className="text-[32px] md:text-[48px] lg:text-[56px] font-extrabold text-slate-900 tracking-tight leading-tight mb-6">
+              Remove Backgrounds Instantly <br className="hidden md:block" />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
+                with AI
+              </span>
+            </h1>
+            <p className="text-[16px] md:text-[18px] text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed font-medium">
+              Upload any image and get a transparent background in seconds. Free, fast and secure.
+            </p>
             
-            <div className="flex items-center gap-4">
-              {file && (
-                <button
-                  onClick={resetAll}
-                  className="text-sm font-medium text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white/5 hidden md:flex"
-                >
-                  <X size={16} /> New Image
-                </button>
-              )}
+            <button
+              onClick={triggerFileInput}
+              className="px-8 md:px-10 py-4 md:py-5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-[18px] md:text-[20px] font-bold rounded-2xl shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center gap-3 mx-auto mb-10"
+            >
+              <Upload className="w-6 h-6" />
+              Upload Image
+            </button>
+            
+            {/* Trust Badges */}
+            <div className="flex flex-wrap justify-center gap-4 sm:gap-6 mb-12">
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-200">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Free Forever
+              </div>
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-200">
+                <ImageIcon className="w-4 h-4 text-emerald-500" /> HD Quality
+              </div>
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-200">
+                <Lock className="w-4 h-4 text-emerald-500" /> No Signup Required
+              </div>
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-200">
+                <Shield className="w-4 h-4 text-emerald-500" /> Secure Processing
+              </div>
             </div>
           </div>
-        </header>
 
-        <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-16 w-full relative z-10 flex flex-col justify-center">
-          <div className="text-center mb-16 flex flex-col items-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-300 text-sm font-medium mb-6">
-              <Sparkles size={14} />
-              <span>Powered by advanced AI</span>
-            </div>
-            <h2 className="text-4xl md:text-6xl font-black tracking-tighter text-white leading-tight">
-              Erase the background.<br />
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-fuchsia-400">Keep the focus.</span>
-            </h2>
-          </div>
-
-          <div className="max-w-4xl mx-auto w-full">
-            {!originalUrl ? (
-              /* Upload State */
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-violet-500/30 rounded-3xl bg-slate-900/40 backdrop-blur-xl p-12 text-center cursor-pointer hover:bg-slate-800/60 hover:border-violet-500/60 transition-all duration-300 group shadow-2xl shadow-violet-900/20"
-              >
-                <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-violet-500/10 text-violet-400 mb-6 group-hover:scale-110 group-hover:bg-violet-500/20 transition-all duration-300">
-                  <Upload size={32} />
+          {/* UPLOAD ZONE */}
+          <div 
+            className={`max-w-3xl mx-auto bg-white rounded-3xl shadow-xl p-8 md:p-16 border-2 transition-all duration-300 ${isHovering ? 'border-indigo-500 bg-indigo-50/50 scale-105' : 'border-dashed border-slate-300'}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {!originalUrl && (
+              <div className="flex flex-col items-center justify-center">
+                <div className="w-24 h-24 mb-6 bg-indigo-50 rounded-full flex items-center justify-center">
+                  <UploadCloud className="w-12 h-12 text-indigo-600" />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-2">Upload Image</h3>
-                <p className="text-slate-400 mb-8">Remove Background</p>
+                <h2 className="text-[22px] md:text-[36px] font-bold text-slate-900 mb-4">Upload an image</h2>
+                <p className="text-slate-500 mb-8 max-w-md mx-auto text-[16px] md:text-[18px]">
+                  Drag and drop your file here, or click the button below to browse your files.
+                </p>
                 <input
                   type="file"
-                  className="hidden"
-                  accept="image/png, image/jpeg, image/jpg"
-                  ref={fileInputRef}
+                  accept="image/png, image/jpeg, image/webp"
                   onChange={handleFileChange}
+                  className="hidden"
+                  ref={fileInputRef}
                 />
-                <span className="relative inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-violet-600 via-fuchsia-500 to-fuchsia-600 bg-[length:200%_auto] px-8 py-3.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_30px_rgba(139,92,246,0.5)] hover:scale-105 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 focus:ring-offset-slate-900 w-auto transition-all duration-500 hover:bg-[100%_center] overflow-hidden group">
-                  <span className="absolute inset-0 w-[200%] h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-[15deg] animate-shine" />
-                  <span className="relative z-10 flex items-center gap-2">
-                    <ImageIcon size={18} className="animate-pulse" />
-                    Select Image
-                  </span>
-                  <span className="absolute -inset-1 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 opacity-30 group-hover:opacity-60 blur-md transition-opacity duration-500 -z-10"></span>
-                </span>
+                <button
+                  onClick={triggerFileInput}
+                  className="px-10 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-[16px] md:text-[18px] font-bold rounded-2xl shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center gap-3"
+                >
+                  <Upload className="w-6 h-6" />
+                  Upload Image
+                </button>
+                <p className="mt-6 text-sm text-slate-400 font-medium">Supports JPG, PNG, WEBP</p>
               </div>
-            ) : (
-              /* Editor State */
-              <div className="bg-slate-900/60 backdrop-blur-2xl rounded-3xl shadow-2xl shadow-black/50 border border-white/10 overflow-hidden flex flex-col md:flex-row">
-                {/* Image Preview Area */}
-                <div className="w-full md:w-2/3 p-6 md:p-8 bg-black/20 flex flex-col items-center justify-center min-h-[400px] relative">
-                  {resultUrl ? (
-                    <div className="relative rounded-2xl overflow-hidden flex-1 flex items-center justify-center w-full" style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}>
-                      {/* Checkered pattern for transparent background */}
-                      {bgColor === 'transparent' && (
-                        <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none" 
-                             style={{
-                               backgroundImage: 'repeating-linear-gradient(45deg, #fff 25%, transparent 25%, transparent 75%, #fff 75%, #fff), repeating-linear-gradient(45deg, #fff 25%, transparent 25%, transparent 75%, #fff 75%, #fff)',
-                               backgroundPosition: '0 0, 10px 10px',
-                               backgroundSize: '20px 20px'
-                             }}
-                        />
-                      )}
-                      <img 
-                        src={resultUrl} 
-                        alt="Result" 
-                        className="max-w-full max-h-[500px] object-contain relative z-10 drop-shadow-2xl" 
-                      />
-                    </div>
-                  ) : (
-                    <div className="relative rounded-2xl overflow-hidden flex-1 flex items-center justify-center w-full">
-                      <img 
-                        src={originalUrl} 
-                        alt="Original" 
-                        className={`max-w-full max-h-[500px] object-contain transition-all duration-500 ${isProcessing ? 'opacity-30 grayscale blur-md scale-95' : 'opacity-100'}`} 
-                      />
-                      
-                      {isProcessing && (
-                        <div className="absolute flex flex-col items-center p-8 bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/10 max-w-[85%] text-center">
-                          <div className="relative mb-6">
-                             <div className="absolute inset-0 bg-violet-600 blur-xl opacity-50 rounded-full animate-pulse"></div>
-                             <RefreshCw className="w-12 h-12 text-white relative z-10 animate-spin" />
-                          </div>
-                          <h4 className="font-bold text-lg text-white mb-3">Removing...</h4>
-                          <div className="w-full h-2.5 bg-slate-800 rounded-full mb-4 overflow-hidden shadow-inner cursor-wait">
-                            <div 
-                              className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-300 ease-out relative" 
-                              style={{ width: `${progress}%` }} 
-                            >
-                               <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
-                            </div>
-                          </div>
-                          <p className="text-sm font-medium text-slate-300">{statusText}</p>
-                        </div>
-                      )}
+            )}
+
+            {originalUrl && !resultUrl && (
+              <div className="flex flex-col items-center">
+                <div className="relative w-full max-w-md overflow-hidden rounded-2xl shadow-md bg-slate-100 flex items-center justify-center min-h-[300px]">
+                  <img src={originalUrl} alt="Original uploaded image" className="max-w-full max-h-[400px] object-contain block" />
+                  
+                  {isProcessing && (
+                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 z-10 transition-all">
+                      <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-6"></div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">{statusText}</h3>
+                      <div className="w-full max-w-xs bg-slate-200 h-2.5 rounded-full overflow-hidden mt-4">
+                        <div 
+                          className="bg-indigo-600 h-full transition-all duration-300"
+                          style={{ width: `${progress}%` }}
+                        ></div>
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* Controls Area */}
-                <div className="w-full md:w-1/3 p-6 md:p-8 flex flex-col border-t md:border-t-0 md:border-l border-white/10">
-                  {!resultUrl ? (
-                    <div className="flex-1 flex flex-col justify-center">
-                      <h3 className="text-xl font-bold text-white mb-3">Step 1: Remove Background</h3>
-                      <p className="text-sm text-slate-400 mb-8 leading-relaxed">
-                        Image uploaded. Click the button below to remove background.
-                      </p>
-                      {errorMessage && (
-                        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm font-medium">
-                          <p>{errorMessage}</p>
-                        </div>
-                      )}
-                      <button
-                        onClick={processImage}
-                        disabled={isProcessing}
-                        className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-4 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all duration-300"
-                      >
-                        {isProcessing ? (
-                          <>
-                            <RefreshCw size={18} className="animate-spin" />
-                            Please wait...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles size={18} />
-                            Remove Background
-                          </>
-                        )}
-                      </button>
-                      
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isProcessing}
-                        className="w-full mt-4 flex items-center justify-center gap-2 rounded-xl bg-white/5 border border-white/10 px-4 py-3.5 text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all duration-300 disabled:opacity-50"
-                      >
-                        <ImageIcon size={18} /> Choose Another Image
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex-1 flex flex-col h-full">
-                      <div className="mb-6 flex items-center font-medium text-emerald-400 bg-emerald-400/10 px-4 py-2.5 rounded-lg border border-emerald-400/20">
-                        <CheckCircle2 size={18} className="mr-2" />
-                        Image ready!
-                      </div>
-                      
-                      <div className="py-6 border-y border-white/10 flex-1">
-                        <h3 className="text-sm font-semibold text-white mb-5 flex items-center gap-2">
-                          <Palette size={16} className="text-violet-400" /> Set New Background
-                        </h3>
-                        <div className="grid grid-cols-3 gap-3">
-                          {COLORS.map((color) => (
-                            <button
-                              key={color.id}
-                              onClick={() => setBgColor(color.value)}
-                              className={`h-12 rounded-xl border-2 flex items-center justify-center transition-all duration-300 ${bgColor === color.value ? 'border-violet-500 scale-105 shadow-lg shadow-violet-500/30' : 'border-white/10 hover:border-white/30 hover:bg-white/5'}`}
-                              style={{ 
-                                backgroundColor: color.value === 'transparent' ? 'transparent' : color.value,
-                                backgroundImage: color.value === 'transparent' ? 'repeating-linear-gradient(45deg, rgba(255,255,255,0.1) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.1) 75%, rgba(255,255,255,0.1)), repeating-linear-gradient(45deg, rgba(255,255,255,0.1) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.1) 75%, rgba(255,255,255,0.1))' : 'none',
-                                backgroundPosition: '0 0, 5px 5px',
-                                backgroundSize: '10px 10px'
-                              }}
-                              title={color.label}
-                            >
-                             {bgColor === color.value && color.value !== 'transparent' && color.value !== '#FFFFFF' && (
-                               <CheckCircle2 size={16} className="text-white drop-shadow-md" />
-                             )}
-                             {bgColor === color.value && color.value === '#FFFFFF' && (
-                               <CheckCircle2 size={16} className="text-slate-900" />
-                             )}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                {errorMessage && (
+                  <div className="mt-8 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-base font-medium max-w-md w-full text-center">
+                    {errorMessage}
+                  </div>
+                )}
 
-                      <div className="pt-6 mt-auto">
-                        <button
-                          onClick={handleDownload}
-                          className="w-full flex items-center justify-center gap-2 rounded-xl bg-white text-slate-900 px-4 py-4 text-sm font-bold shadow-xl shadow-white/10 hover:shadow-white/20 hover:scale-[1.02] transition-all duration-300"
-                        >
-                          <Download size={18} />
-                          Save Image
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                <div className="flex flex-wrap items-center justify-center gap-4 mt-8">
+                  <button
+                    onClick={processImage}
+                    disabled={isProcessing}
+                    className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-lg font-bold rounded-xl shadow-md transition-all flex items-center gap-2"
+                  >
+                    {isProcessing ? (
+                      <RefreshCw className="animate-spin w-5 h-5" />
+                    ) : (
+                      <Wand2 className="w-5 h-5" />
+                    )}
+                    {isProcessing ? 'Processing...' : 'Remove Background'}
+                  </button>
+                  <button
+                    onClick={resetAll}
+                    disabled={isProcessing}
+                    className="px-8 py-4 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 disabled:opacity-50 text-lg font-bold rounded-xl shadow-sm transition-all"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Eye-catching Showcase Section */}
-          {!originalUrl && (
-            <div className="mt-32 max-w-5xl mx-auto w-full relative z-10">
-              <div className="text-center mb-16">
-                <h3 className="text-3xl md:text-5xl font-extrabold text-white mb-6">
-                  Experience <span className="bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-fuchsia-400">The Power of Remove</span>
-                </h3>
-                <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-                  Professional-grade AI right in your browser. No complicated tools or expensive software needed anymore.
-                </p>
-            <div className="mt-10 flex justify-center items-center">
-              <div className="relative group inline-flex perspective-1000">
-                <div className="absolute inset-0 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-500 blur-[24px] opacity-30 group-hover:opacity-70 transition-opacity duration-700 animate-pulse"></div>
-                <span className="relative text-3xl md:text-5xl font-black tracking-[0.2em] text-transparent bg-clip-text animate-text-shine z-10 select-none bg-[linear-gradient(110deg,#8b5cf6,45%,#ffffff,55%,#8b5cf6)] bg-[length:200%_auto]">
-                  NO DRINK
-                </span>
+            {/* RESULTS VIEW */}
+            {resultUrl && (
+              <div id="results-section" className="flex flex-col animate-fade-in-up w-full">
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className="text-[22px] md:text-[36px] font-bold text-slate-900">Your Result</h2>
+                  <button onClick={resetAll} className="text-indigo-600 font-semibold hover:text-indigo-800 flex items-center gap-2">
+                    <Upload className="w-4 h-4" /> Upload New
+                  </button>
+                </div>
+
+                {/* Before / After Comparison Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 w-full">
+                  <div className="flex flex-col">
+                    <span className="text-slate-500 font-semibold text-sm mb-3 uppercase tracking-wider">Original image</span>
+                    <div className="bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 shadow-inner min-h-[300px] flex items-center justify-center p-2 relative">
+                      <img src={originalUrl!} alt="Original" className="max-w-full max-h-[400px] object-contain block z-10" />
+                    </div>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-indigo-600 font-semibold text-sm mb-3 uppercase tracking-wider flex items-center gap-1">
+                      <Sparkles className="w-4 h-4" /> Background Removed
+                    </span>
+                    <div 
+                      className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm min-h-[300px] flex items-center justify-center p-2 relative checkerboard-bg"
+                    >
+                      <img src={resultUrl} alt="Result" className="max-w-full max-h-[400px] object-contain block z-10 drop-shadow-md" style={{ backgroundColor: bgColor !== 'transparent' ? bgColor : 'transparent' }} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions & Customization */}
+                <div className="bg-slate-50 p-6 sm:p-8 rounded-2xl border border-slate-200 mb-6 flex flex-col md:flex-row gap-8 items-center md:items-start justify-between w-full">
+                  <div className="flex-1 w-full flex flex-col">
+                    <p className="text-slate-900 font-bold mb-4 flex items-center gap-2">
+                      <Palette className="w-5 h-5 text-indigo-600" />
+                      Add Background Color (Optional)
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      {COLORS.map((color) => (
+                        <button
+                          key={color.id}
+                          className={`w-12 h-12 rounded-full border-2 transition-all shadow-sm ${
+                            bgColor === color.value 
+                              ? 'border-indigo-600 scale-110 shadow-md ring-2 ring-indigo-200' 
+                              : 'border-slate-300 hover:border-slate-400 border-dashed'
+                          }`}
+                          style={{
+                            backgroundColor: color.value === 'transparent' ? '#f8fafc' : color.value,
+                            backgroundImage: color.value === 'transparent' 
+                              ? 'linear-gradient(45deg, #e2e8f0 25%, transparent 25%, transparent 75%, #e2e8f0 75%, #e2e8f0), linear-gradient(45deg, #e2e8f0 25%, transparent 25%, transparent 75%, #e2e8f0 75%, #e2e8f0)' 
+                              : 'none',
+                            backgroundSize: color.value === 'transparent' ? '12px 12px' : 'auto',
+                            backgroundPosition: color.value === 'transparent' ? '0 0, 6px 6px' : '0% 0%'
+                          }}
+                          onClick={() => setBgColor(color.value)}
+                          title={color.label}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col gap-4 w-full md:w-auto">
+                    <button
+                      onClick={handleDownload}
+                      className="w-full md:w-auto px-10 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-[16px] md:text-[18px] font-bold rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3"
+                    >
+                      <Download className="w-6 h-6" />
+                      Download HD Image
+                    </button>
+                    {bgColor !== 'transparent' && (
+                      <button
+                        onClick={processImage}
+                        disabled={isProcessing}
+                        className="w-full md:w-auto px-6 py-3 bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 text-[16px] md:text-[18px] font-bold rounded-xl shadow-sm transition-all"
+                      >
+                        Apply Background Color
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* FEATURES SECTION */}
+        <section id="features" className="py-24 bg-slate-900 text-white">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="text-center mb-16">
+              <h2 className="text-[22px] md:text-[36px] font-bold mb-6">Features</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="bg-slate-800/50 p-8 rounded-2xl border border-slate-700">
+                <Zap className="w-10 h-10 text-indigo-400 mb-6" />
+                <h3 className="text-[20px] md:text-[24px] font-bold text-white mb-4">Fast AI Processing</h3>
+                <p className="text-[16px] text-slate-400 leading-relaxed">Don't wait minutes for processing. Our highly optimized infrastructure processes images instantly in real-time.</p>
+              </div>
+              <div className="bg-slate-800/50 p-8 rounded-2xl border border-slate-700">
+                <ImageIcon className="w-10 h-10 text-purple-400 mb-6" />
+                <h3 className="text-[20px] md:text-[24px] font-bold text-white mb-4">High Quality Output</h3>
+                <p className="text-[16px] text-slate-400 leading-relaxed">Handles difficult edges effortlessly. Keep high resolution without quality loss.</p>
+              </div>
+              <div className="bg-slate-800/50 p-8 rounded-2xl border border-slate-700">
+                <Download className="w-10 h-10 text-emerald-400 mb-6" />
+                <h3 className="text-[20px] md:text-[24px] font-bold text-white mb-4">Transparent PNG Download</h3>
+                <p className="text-[16px] text-slate-400 leading-relaxed">Get a clean transparent background downloaded straight to your device in standard PNG format.</p>
+              </div>
+              <div className="bg-slate-800/50 p-8 rounded-2xl border border-slate-700">
+                <Clock className="w-10 h-10 text-pink-400 mb-6" />
+                <h3 className="text-[20px] md:text-[24px] font-bold text-white mb-4">Mobile Friendly</h3>
+                <p className="text-[16px] text-slate-400 leading-relaxed">Remove backgrounds perfectly on your phone, tablet, or desktop with our fully responsive web tool.</p>
               </div>
             </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-                {/* Feature Card 1 */}
-                <div className="group relative rounded-[2rem] bg-slate-900/40 backdrop-blur-xl border border-white/10 p-8 hover:bg-slate-800/60 transition-all duration-500 hover:-translate-y-2 shadow-2xl overflow-hidden cursor-default">
-                  <div className="absolute -top-12 -right-12 w-32 h-32 bg-fuchsia-600/30 rounded-full blur-[40px] group-hover:bg-fuchsia-600/50 transition-all duration-500"></div>
-                  <div className="bg-gradient-to-br from-fuchsia-500/20 to-fuchsia-600/10 w-16 h-16 rounded-2xl flex items-center justify-center mb-8 border border-fuchsia-500/30 group-hover:scale-110 transition-transform duration-500 shadow-lg shadow-fuchsia-500/10">
-                    <Zap className="text-fuchsia-400" size={32} />
-                  </div>
-                  <h4 className="text-2xl font-bold text-white mb-4">Lightning Fast</h4>
-                  <p className="text-slate-400 leading-relaxed text-base">
-                    Drop your image and get unbelievable results in just seconds. Our fully optimized AI engine works completely on the fly without waiting.
-                  </p>
-                </div>
-
-                {/* Feature Card 2 */}
-                <div className="group relative rounded-[2rem] bg-slate-900/40 backdrop-blur-xl border border-white/10 p-8 hover:bg-slate-800/60 transition-all duration-500 hover:-translate-y-2 shadow-2xl overflow-hidden cursor-default md:-translate-y-4">
-                  <div className="absolute inset-0 border border-violet-500/30 rounded-[2rem] group-hover:border-violet-500/50 transition-colors duration-500"></div>
-                  <div className="absolute -top-12 -right-12 w-40 h-40 bg-violet-600/30 rounded-full blur-[40px] group-hover:bg-violet-600/60 transition-all duration-500"></div>
-                  <div className="bg-gradient-to-br from-violet-500/20 to-violet-600/10 w-16 h-16 rounded-2xl flex items-center justify-center mb-8 border border-violet-500/30 group-hover:rotate-12 transition-transform duration-500 shadow-lg shadow-violet-500/10">
-                    <Wand2 className="text-violet-400" size={32} />
-                  </div>
-                  <h4 className="text-2xl font-bold text-white mb-4">Pixel Perfect</h4>
-                  <p className="text-slate-400 leading-relaxed text-base">
-                    Incredible precision to easily handle difficult edges like fur, hair, and complex details without weird cutoffs or jagged pixels.
-                  </p>
-                </div>
-
-                {/* Feature Card 3 */}
-                <div className="group relative rounded-[2rem] bg-slate-900/40 backdrop-blur-xl border border-white/10 p-8 hover:bg-slate-800/60 transition-all duration-500 hover:-translate-y-2 shadow-2xl overflow-hidden cursor-default">
-                  <div className="absolute -top-12 -right-12 w-32 h-32 bg-sky-500/30 rounded-full blur-[40px] group-hover:bg-sky-500/50 transition-all duration-500"></div>
-                  <div className="bg-gradient-to-br from-sky-500/20 to-sky-600/10 w-16 h-16 rounded-2xl flex items-center justify-center mb-8 border border-sky-500/30 group-hover:scale-110 transition-transform duration-500 shadow-lg shadow-sky-500/10">
-                    <Shield className="text-sky-400" size={32} />
-                  </div>
-                  <h4 className="text-2xl font-bold text-white mb-4">100% Private</h4>
-                  <p className="text-slate-400 leading-relaxed text-base">
-                    Every image processing happens securely inside your browser. No files are uploaded to any external or cloud servers ever.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </main>
-
-        {/* Footer */}
-        <footer className="py-8 relative z-20 w-full text-center border-t border-white/5 bg-slate-950/40 backdrop-blur-xl mt-auto">
-          <div className="flex flex-col items-center justify-center gap-2">
-            <p className="text-slate-400 text-sm font-medium tracking-wide flex items-center justify-center gap-2">
-              <Sparkles size={14} className="text-violet-400/80" />
-              Seamless extraction. Limitless creativity.
-              <Sparkles size={14} className="text-fuchsia-400/80" />
-            </p>
-            <p className="text-xs text-slate-500/80 font-medium tracking-widest uppercase">
-              Transforming pixels with instant remove
-            </p>
           </div>
-        </footer>
+        </section>
 
-        {/* Global Floating Telegram Button */}
-        <a 
-          href="https://t.me/+ab_awlOXjnFlMjI1"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="group fixed bottom-6 right-6 z-50 flex items-center justify-center p-3 sm:py-3 sm:px-6 rounded-full bg-gradient-to-r from-[#2AABEE] to-[#229ED9] shadow-[0_4px_30px_rgba(42,171,238,0.5)] transition-all duration-500 hover:scale-[1.15] hover:-translate-y-2 hover:shadow-[0_8px_40px_rgba(42,171,238,0.8)] overflow-hidden"
-        >
-          {/* Shine effect inside the button */}
-          <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-[15deg] animate-shine" />
+        {/* HOW IT WORKS */}
+        <section id="how-it-works" className="py-20 px-4 max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-[22px] md:text-[36px] font-bold text-slate-900 mb-6">How it works</h2>
+            <p className="text-[16px] md:text-[18px] text-slate-600 max-w-2xl mx-auto">Skip the complicated photo editing software. Get perfect cutouts in three simple steps.</p>
+          </div>
           
-          <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 rounded-full transition-opacity duration-300" />
-          <div className="relative z-10 flex items-center justify-center gap-2.5">
-            <svg className="w-7 h-7 sm:w-6 sm:h-6 text-white group-hover:rotate-12 transition-transform duration-500" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.888-.662 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
-            </svg>
-            <span className="hidden sm:inline-block text-sm font-bold text-white tracking-wide">
-              Join Telegram
-            </span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+            <div className="text-center flex flex-col items-center">
+              <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6 shadow-sm border border-indigo-200">
+                <UploadCloud className="w-8 h-8" />
+              </div>
+              <h3 className="text-[22px] md:text-[28px] font-bold text-slate-900 mb-4">Step 1: Upload Image</h3>
+              <p className="text-[16px] md:text-[18px] text-slate-600 leading-relaxed">Simply drag and drop your photo into our tool, or browse your files to upload an image. We support JPG, PNG, and WebP.</p>
+            </div>
+            <div className="text-center flex flex-col items-center relative">
+              <div className="hidden md:block absolute top-10 -right-5 transform translate-x-1/2 w-10 text-slate-300">
+                 <ArrowRight />
+              </div>
+              <div className="hidden md:block absolute top-10 -left-5 transform -translate-x-1/2 w-10 text-slate-300">
+                 <ArrowRight />
+              </div>
+              <div className="w-20 h-20 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mb-6 shadow-sm border border-purple-200">
+                <Wand2 className="w-8 h-8" />
+              </div>
+              <h3 className="text-[22px] md:text-[28px] font-bold text-slate-900 mb-4">Step 2: AI Removes Background</h3>
+              <p className="text-[16px] md:text-[18px] text-slate-600 leading-relaxed">Our advanced AI will automatically identify the subject and erase the background in just a few seconds with pixel-perfect accuracy.</p>
+            </div>
+            <div className="text-center flex flex-col items-center">
+              <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-6 shadow-sm border border-emerald-200">
+                <Download className="w-8 h-8" />
+              </div>
+              <h3 className="text-[22px] md:text-[28px] font-bold text-slate-900 mb-4">Step 3: Download Result</h3>
+              <p className="text-[16px] md:text-[18px] text-slate-600 leading-relaxed">Download your new transparent PNG immediately. You can even add a completely new solid color background if needed.</p>
+            </div>
           </div>
-          {/* Echo effect */}
-          <span className="absolute -inset-1 rounded-full bg-[#2AABEE] opacity-20 animate-ping -z-10 duration-[2000ms]"></span>
-          <span className="absolute -inset-2 rounded-full border border-[#2AABEE]/30 rounded-full animate-ping -z-10 duration-[3000ms] delay-500"></span>
-        </a>
-      </div>
+        </section>
+
+        {/* FAQ SECTION */}
+        <section id="faq" className="py-24 px-4 bg-white">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-[22px] md:text-[36px] font-bold text-slate-900 mb-12 text-center">Frequently Asked Questions</h2>
+            <div className="space-y-6">
+              {[
+                {
+                  q: "What is AI Background Remover?",
+                  a: "Our free AI Background Remover uses advanced machine learning algorithms to automatically detect the main subject of any photo and erase the background around it, producing a clean, transparent HD PNG image."
+                },
+                {
+                  q: "Is this tool completely free to use?",
+                  a: "Yes! You can upload images and download the processed transparent PNG images absolutely free. There are no hidden fees, watermarks, or subscriptions required."
+                },
+                {
+                  q: "Which image formats are supported?",
+                  a: "We currently support standard formats including JPG, JPEG, PNG, and WebP. The resulting downloaded image will always be a transparent PNG."
+                },
+                {
+                   q: "How does it handle complex edges like hair?",
+                   a: "Our advanced AI models have been trained specifically to separate fine details like hair, fur, and intricate edges perfectly without jagged lines or color bleeding."
+                },
+                {
+                  q: "Are my images private and secure?",
+                  a: "Absolutely. We take your privacy seriously. Uploaded files are processed securely and deleted automatically. We do not store your images long-term or use them for training our models."
+                }
+              ].map((faq, i) => (
+                <div key={i} className="bg-slate-50 border border-slate-200 rounded-2xl p-6 md:p-8 hover:shadow-md transition-shadow">
+                  <h3 className="text-[22px] md:text-[28px] font-bold text-slate-900 mb-3">{faq.q}</h3>
+                  <p className="text-slate-600 text-[16px] md:text-[18px] leading-relaxed">{faq.a}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+        {/* SEO CONTENT SECTION */}
+        <section className="py-24 px-4 bg-slate-50">
+          <div className="max-w-4xl mx-auto prose prose-slate md:prose-lg text-slate-700">
+            <h2 className="text-[22px] md:text-[36px] font-bold text-slate-900 mb-6 font-sans">The Best Free AI Background Remover Online</h2>
+            
+            <p className="mb-6 leading-relaxed">
+              In today's fast-paced digital world, creating stunning visuals quickly is more important than ever. Whether you are an e-commerce store owner preparing product photos, a marketer designing ad campaigns, or a social media influencer curating the perfect feed, you need high-quality images. Our <strong>AI Background Remover</strong> is the ultimate solution to instantly isolate your subjects and create beautiful transparent PNGs. There is no need to spend hours manually tracing complex edges in heavy, expensive photo editing software. With just one click, you can get professional-grade cutouts.
+            </p>
+
+            <h2 className="text-[20px] md:text-[28px] font-bold text-slate-900 mt-12 mb-6 font-sans">Why Use an Automated Background Eraser?</h2>
+            
+            <p className="mb-6 leading-relaxed">
+              Masking hair, fur, and intricate object borders used to be a tedious task that required extensive design skills. Our tool leverages state-of-the-art machine learning models trained on millions of images to understand context, depth, and boundaries. When you upload a photo, our system automatically detects the foreground object and smoothly erases the background. The precision of our AI ensures that even the most difficult details are preserved, leaving you with a clean, high-resolution transparent image.
+            </p>
+
+            <p className="mb-6 leading-relaxed">
+              Moreover, using our tool is completely free. We believe that professional creative tools should be accessible to everyone. There are no hidden subscription fees, no watermarks placed on your final images, and no account signup required to use the basic features. It's incredibly fast, allowing you to drag, drop, and download your transparent PNG in a matter of seconds.
+            </p>
+
+            <h2 className="text-[20px] md:text-[28px] font-bold text-slate-900 mt-12 mb-6 font-sans">Versatile Use Cases for Your Cutouts</h2>
+            
+            <ul className="list-disc pl-6 mb-8 space-y-3">
+              <li><strong>E-commerce Product Photography:</strong> Easily remove distracting backgrounds to place your products on a clean white canvas. Consistent, professional product images increase conversion rates and customer trust.</li>
+              <li><strong>Graphic Design and Marketing:</strong> Quickly separate subjects to overlay onto promotional flyers, YouTube thumbnails, and Instagram posts. Our transparent PNGs blend perfectly into any digital layout.</li>
+              <li><strong>Personal Projects:</strong> Create fun stickers for messaging apps, combine different photos into creative collages, or prepare outstanding professional headshots for your LinkedIn profile.</li>
+            </ul>
+
+            <p className="leading-relaxed">
+              Privacy and security are our top priorities. All processing is securely handled on our cloud infrastructure, and we do not store your images permanently. Your uploaded files and generated cutouts are deleted automatically shortly after you download them. Try out the fastest, most highly-rated free AI background remover today and elevate your visual content in seconds.
+            </p>
+          </div>
+        </section>
+        </>
+        ) : (
+          <section className="px-4 py-16 md:py-24 max-w-4xl mx-auto">
+              <div className="bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-slate-200">
+               {currentView === 'about' && (
+                  <div>
+                    <h1 className="text-[32px] md:text-[48px] lg:text-[56px] font-bold text-slate-900 mb-6">About Us</h1>
+                    <p className="text-[16px] md:text-[18px] text-slate-600 mb-6 leading-relaxed">
+                       We're a team of passionate developers and AI enthusiasts dedicated to making high-quality creative tools accessible to everyone. Our background remover uses state-of-the-art machine learning models to provide professional-grade results without the professional-grade price tag.
+                    </p>
+                    <p className="text-[16px] md:text-[18px] text-slate-600 leading-relaxed">
+                       Our mission is to empower creators, marketers, and businesses of all sizes to work faster and more efficiently. We believe that repetitive tasks like masking and cutting out subjects should be entirely automated, letting you focus on the creative work that matters.
+                    </p>
+                  </div>
+               )}
+               {currentView === 'privacy' && (
+                  <div>
+                    <h1 className="text-[32px] md:text-[48px] lg:text-[56px] font-bold text-slate-900 mb-6">Privacy Policy</h1>
+                    <p className="text-[16px] md:text-[18px] text-slate-600 mb-6 leading-relaxed">
+                       Last updated: {new Date().toLocaleDateString()}
+                    </p>
+                    <h3 className="text-[22px] md:text-[28px] font-bold text-slate-900 mb-4">1. Data Storage</h3>
+                    <p className="text-[16px] md:text-[18px] text-slate-600 mb-6 leading-relaxed">
+                       We highly respect your privacy. Any image uploaded to our service is processed securely. We do not permanently store your images on our servers. Images are temporarily held only for the duration of the processing and immediately deleted afterward.
+                    </p>
+                    <h3 className="text-[22px] md:text-[28px] font-bold text-slate-900 mb-4">2. AI Training</h3>
+                    <p className="text-[16px] md:text-[18px] text-slate-600 mb-6 leading-relaxed">
+                       We strictly do not use user-uploaded images to train, fine-tune, or improve our AI models. Your creative property remains yours.
+                    </p>
+                  </div>
+               )}
+               {currentView === 'terms' && (
+                  <div>
+                    <h1 className="text-[32px] md:text-[48px] lg:text-[56px] font-bold text-slate-900 mb-6">Terms of Service</h1>
+                    <h3 className="text-[22px] md:text-[28px] font-bold text-slate-900 mb-4">Service Availability</h3>
+                    <p className="text-[16px] md:text-[18px] text-slate-600 mb-6 leading-relaxed">
+                       Our AI Background Remover is provided "as is" and free of charge. While we strive for 100% uptime, we do not guarantee continuous, uninterrupted access to the service.
+                    </p>
+                    <h3 className="text-[22px] md:text-[28px] font-bold text-slate-900 mb-4">Acceptable Use</h3>
+                    <p className="text-[16px] md:text-[18px] text-slate-600 leading-relaxed">
+                       You agree not to use the service for uploading illicit or illegal content. We reserve the right to block users who abuse the free API.
+                    </p>
+                  </div>
+               )}
+               {currentView === 'contact' && (
+                  <div>
+                    <h1 className="text-[32px] md:text-[48px] lg:text-[56px] font-bold text-slate-900 mb-6">Contact Us</h1>
+                    <p className="text-[16px] md:text-[18px] text-slate-600 mb-6 leading-relaxed">
+                       Have a question, feedback, or a partnership inquiry? We'd love to hear from you.
+                    </p>
+                    <form className="space-y-4 max-w-lg mt-8" onSubmit={(e) => { e.preventDefault(); alert('Message sent!'); setCurrentView('home'); }}>
+                       <div>
+                         <label className="block text-sm font-semibold text-slate-700 mb-2">Email Address</label>
+                         <input type="email" required className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-[16px]" placeholder="you@company.com" />
+                       </div>
+                       <div>
+                         <label className="block text-sm font-semibold text-slate-700 mb-2">Message</label>
+                         <textarea required rows={4} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-[16px]" placeholder="How can we help?"></textarea>
+                       </div>
+                       <button type="submit" className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[16px] md:text-[18px] rounded-xl shadow-md transition-all">Send Message</button>
+                    </form>
+                  </div>
+               )}
+             </div>
+          </section>
+        )}
+      </main>
+
+      {/* FOOTER */}
+      <footer className="bg-slate-950 pt-20 pb-10 text-slate-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+            <div className="md:col-span-2">
+              <div className="flex items-center gap-2 mb-6 text-white cursor-pointer">
+                <div className="bg-gradient-to-br from-indigo-500 to-purple-500 p-2 rounded-xl text-white shadow-lg">
+                  <Sparkles size={20} />
+                </div>
+                <span className="text-2xl font-bold tracking-tight">AI Background Remover</span>
+              </div>
+              <p className="text-slate-400 text-base max-w-sm mb-6 leading-relaxed">
+                Empowering creators, designers, and businesses with instant, high-quality image processing entirely for free.
+              </p>
+            </div>
+            
+            <div>
+              <h4 className="text-white font-bold text-lg mb-6">Company</h4>
+              <ul className="space-y-4">
+                <li><button onClick={() => setCurrentView('about')} className="hover:text-white transition-colors">About Us</button></li>
+                <li><button onClick={() => setCurrentView('contact')} className="hover:text-white transition-colors">Contact Us</button></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="text-white font-bold text-lg mb-6">Legal</h4>
+              <ul className="space-y-4">
+                <li><button onClick={() => setCurrentView('privacy')} className="hover:text-white transition-colors">Privacy Policy</button></li>
+                <li><button onClick={() => setCurrentView('terms')} className="hover:text-white transition-colors">Terms of Service</button></li>
+              </ul>
+            </div>
+          </div>
+          
+          <div className="border-t border-slate-800 pt-8 flex flex-col justify-between items-center text-center gap-4">
+            <p className="text-slate-500 text-sm">© {new Date().getFullYear()} AI Background Remover. All rights reserved.</p>
+            <p className="text-slate-500 text-sm flex items-center gap-1.5 justify-center">
+              Crafted with <Sparkles size={12} className="text-indigo-400" /> for creators
+            </p>
+          </div>
+        </div>
+      </footer>
+       
+      {/* Global Styles Addition for Checkerboard */}
+      <style>{`
+        .checkerboard-bg {
+          background-image: 
+            linear-gradient(45deg, #e2e8f0 25%, transparent 25%), 
+            linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), 
+            linear-gradient(45deg, transparent 75%, #e2e8f0 75%), 
+            linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+          background-size: 20px 20px;
+          background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+      `}</style>
+    </div>
   );
 }
