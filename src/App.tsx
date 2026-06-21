@@ -167,12 +167,7 @@ export default function App() {
           </div>
           <nav className="hidden md:flex items-center gap-6">
             <button onClick={() => setCurrentView('home')} className="text-slate-600 hover:text-indigo-600 font-medium">Home</button>
-            <button onClick={() => { setCurrentView('home'); setTimeout(() => document.getElementById('features')?.scrollIntoView({behavior: 'smooth'}), 50); }} className="text-slate-600 hover:text-indigo-600 font-medium">Features</button>
-            <button onClick={() => { setCurrentView('home'); setTimeout(() => document.getElementById('faq')?.scrollIntoView({behavior: 'smooth'}), 50); }} className="text-slate-600 hover:text-indigo-600 font-medium">FAQ</button>
             <button onClick={() => setCurrentView('contact')} className="text-slate-600 hover:text-indigo-600 font-medium">Contact</button>
-            <button onClick={() => { setCurrentView('home'); triggerFileInput(); }} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-sm transition-all">
-              Upload Image
-            </button>
           </nav>
         </div>
       </header>
@@ -192,14 +187,6 @@ export default function App() {
             <p className="text-[16px] md:text-[18px] text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed font-medium">
               Upload any image and get a transparent background in seconds. Free, fast and secure.
             </p>
-            
-            <button
-              onClick={triggerFileInput}
-              className="px-8 md:px-10 py-4 md:py-5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-[18px] md:text-[20px] font-bold rounded-2xl shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center gap-3 mx-auto mb-10"
-            >
-              <Upload className="w-6 h-6" />
-              Upload Image
-            </button>
             
             {/* Trust Badges */}
             <div className="flex flex-wrap justify-center gap-4 sm:gap-6 mb-12">
@@ -387,38 +374,6 @@ export default function App() {
           </div>
         </section>
 
-        {/* FEATURES SECTION */}
-        <section id="features" className="py-24 bg-slate-900 text-white">
-          <div className="max-w-7xl mx-auto px-4">
-            <div className="text-center mb-16">
-              <h2 className="text-[22px] md:text-[36px] font-bold mb-6">Features</h2>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-              <div className="bg-slate-800/50 p-8 rounded-2xl border border-slate-700">
-                <Zap className="w-10 h-10 text-indigo-400 mb-6" />
-                <h3 className="text-[20px] md:text-[24px] font-bold text-white mb-4">Fast AI Processing</h3>
-                <p className="text-[16px] text-slate-400 leading-relaxed">Don't wait minutes for processing. Our highly optimized infrastructure processes images instantly in real-time.</p>
-              </div>
-              <div className="bg-slate-800/50 p-8 rounded-2xl border border-slate-700">
-                <ImageIcon className="w-10 h-10 text-purple-400 mb-6" />
-                <h3 className="text-[20px] md:text-[24px] font-bold text-white mb-4">High Quality Output</h3>
-                <p className="text-[16px] text-slate-400 leading-relaxed">Handles difficult edges effortlessly. Keep high resolution without quality loss.</p>
-              </div>
-              <div className="bg-slate-800/50 p-8 rounded-2xl border border-slate-700">
-                <Download className="w-10 h-10 text-emerald-400 mb-6" />
-                <h3 className="text-[20px] md:text-[24px] font-bold text-white mb-4">Transparent PNG Download</h3>
-                <p className="text-[16px] text-slate-400 leading-relaxed">Get a clean transparent background downloaded straight to your device in standard PNG format.</p>
-              </div>
-              <div className="bg-slate-800/50 p-8 rounded-2xl border border-slate-700">
-                <Clock className="w-10 h-10 text-pink-400 mb-6" />
-                <h3 className="text-[20px] md:text-[24px] font-bold text-white mb-4">Mobile Friendly</h3>
-                <p className="text-[16px] text-slate-400 leading-relaxed">Remove backgrounds perfectly on your phone, tablet, or desktop with our fully responsive web tool.</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* HOW IT WORKS */}
         <section id="how-it-works" className="py-20 px-4 max-w-7xl mx-auto">
           <div className="text-center mb-16">
@@ -452,76 +407,13 @@ export default function App() {
                 <Download className="w-8 h-8" />
               </div>
               <h3 className="text-[22px] md:text-[28px] font-bold text-slate-900 mb-4">Step 3: Download Result</h3>
-              <p className="text-[16px] md:text-[18px] text-slate-600 leading-relaxed">Download your new transparent PNG immediately. You can even add a completely new solid color background if needed.</p>
+              <p className="text-[16px] md:text-[18px] text-slate-600 leading-relaxed mb-6">Download your new transparent PNG immediately. You can even add a completely new solid color background if needed.</p>
+              <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-slate-900 to-slate-800 text-white font-medium shadow-xl">
+                <Sparkles className="w-5 h-5 text-amber-400" />
+                <span className="tracking-widest text-[18px]">𒆜 𝑴𝒓.𝑺𝒊𝒂𝒎 𒆜</span>
+                <Sparkles className="w-5 h-5 text-amber-400" />
+              </div>
             </div>
-          </div>
-        </section>
-
-        {/* FAQ SECTION */}
-        <section id="faq" className="py-24 px-4 bg-white">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-[22px] md:text-[36px] font-bold text-slate-900 mb-12 text-center">Frequently Asked Questions</h2>
-            <div className="space-y-6">
-              {[
-                {
-                  q: "What is AI Background Remover?",
-                  a: "Our free AI Background Remover uses advanced machine learning algorithms to automatically detect the main subject of any photo and erase the background around it, producing a clean, transparent HD PNG image."
-                },
-                {
-                  q: "Is this tool completely free to use?",
-                  a: "Yes! You can upload images and download the processed transparent PNG images absolutely free. There are no hidden fees, watermarks, or subscriptions required."
-                },
-                {
-                  q: "Which image formats are supported?",
-                  a: "We currently support standard formats including JPG, JPEG, PNG, and WebP. The resulting downloaded image will always be a transparent PNG."
-                },
-                {
-                   q: "How does it handle complex edges like hair?",
-                   a: "Our advanced AI models have been trained specifically to separate fine details like hair, fur, and intricate edges perfectly without jagged lines or color bleeding."
-                },
-                {
-                  q: "Are my images private and secure?",
-                  a: "Absolutely. We take your privacy seriously. Uploaded files are processed securely and deleted automatically. We do not store your images long-term or use them for training our models."
-                }
-              ].map((faq, i) => (
-                <div key={i} className="bg-slate-50 border border-slate-200 rounded-2xl p-6 md:p-8 hover:shadow-md transition-shadow">
-                  <h3 className="text-[22px] md:text-[28px] font-bold text-slate-900 mb-3">{faq.q}</h3>
-                  <p className="text-slate-600 text-[16px] md:text-[18px] leading-relaxed">{faq.a}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-        {/* SEO CONTENT SECTION */}
-        <section className="py-24 px-4 bg-slate-50">
-          <div className="max-w-4xl mx-auto prose prose-slate md:prose-lg text-slate-700">
-            <h2 className="text-[22px] md:text-[36px] font-bold text-slate-900 mb-6 font-sans">The Best Free AI Background Remover Online</h2>
-            
-            <p className="mb-6 leading-relaxed">
-              In today's fast-paced digital world, creating stunning visuals quickly is more important than ever. Whether you are an e-commerce store owner preparing product photos, a marketer designing ad campaigns, or a social media influencer curating the perfect feed, you need high-quality images. Our <strong>AI Background Remover</strong> is the ultimate solution to instantly isolate your subjects and create beautiful transparent PNGs. There is no need to spend hours manually tracing complex edges in heavy, expensive photo editing software. With just one click, you can get professional-grade cutouts.
-            </p>
-
-            <h2 className="text-[20px] md:text-[28px] font-bold text-slate-900 mt-12 mb-6 font-sans">Why Use an Automated Background Eraser?</h2>
-            
-            <p className="mb-6 leading-relaxed">
-              Masking hair, fur, and intricate object borders used to be a tedious task that required extensive design skills. Our tool leverages state-of-the-art machine learning models trained on millions of images to understand context, depth, and boundaries. When you upload a photo, our system automatically detects the foreground object and smoothly erases the background. The precision of our AI ensures that even the most difficult details are preserved, leaving you with a clean, high-resolution transparent image.
-            </p>
-
-            <p className="mb-6 leading-relaxed">
-              Moreover, using our tool is completely free. We believe that professional creative tools should be accessible to everyone. There are no hidden subscription fees, no watermarks placed on your final images, and no account signup required to use the basic features. It's incredibly fast, allowing you to drag, drop, and download your transparent PNG in a matter of seconds.
-            </p>
-
-            <h2 className="text-[20px] md:text-[28px] font-bold text-slate-900 mt-12 mb-6 font-sans">Versatile Use Cases for Your Cutouts</h2>
-            
-            <ul className="list-disc pl-6 mb-8 space-y-3">
-              <li><strong>E-commerce Product Photography:</strong> Easily remove distracting backgrounds to place your products on a clean white canvas. Consistent, professional product images increase conversion rates and customer trust.</li>
-              <li><strong>Graphic Design and Marketing:</strong> Quickly separate subjects to overlay onto promotional flyers, YouTube thumbnails, and Instagram posts. Our transparent PNGs blend perfectly into any digital layout.</li>
-              <li><strong>Personal Projects:</strong> Create fun stickers for messaging apps, combine different photos into creative collages, or prepare outstanding professional headshots for your LinkedIn profile.</li>
-            </ul>
-
-            <p className="leading-relaxed">
-              Privacy and security are our top priorities. All processing is securely handled on our cloud infrastructure, and we do not store your images permanently. Your uploaded files and generated cutouts are deleted automatically shortly after you download them. Try out the fastest, most highly-rated free AI background remover today and elevate your visual content in seconds.
-            </p>
           </div>
         </section>
         </>
